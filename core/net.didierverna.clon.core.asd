@@ -65,6 +65,8 @@ complete description of Clon, see the net.didierverna.clon system."
 						  ("switch-base"))
 					   (:file "stropt"
 					    :depends-on ("valued"))
+					   (:file "strlist"
+					    :depends-on ("valued"))
 					   (:file "lispobj"
 					    :depends-on ("valued"))
 					   (:file "path"

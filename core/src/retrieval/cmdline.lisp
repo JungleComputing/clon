@@ -58,6 +58,22 @@ If so, store it in CMDLINE-ARGUMENT."
 	      (argument-popable-p ,cmdline))
      (setq ,cmdline-argument (pop ,cmdline))))
 
+(defmacro maybe-pop-argument-list (cmdline option cmdline-argument)
+  "Pop OPTION's arguments from CMDLINE if needed.
+If so, store it in CMDLINE-ARGUMENT."
+  ;; At the time this macro is called, CMDLINE-ARGUMENT may already contain
+  ;; something, provided by either a sticky argument from a short call, or an
+  ;; =-syntax from a long call. Remember that these are the only 2 ways to
+  ;; provide optional arguments, so the need to pop something occurs only
+  ;; when an argument is mandatory, and it is still missing.
+  `(progn (when (and (null ,cmdline-argument)
+                     (argument-required-p ,option)
+                     (argument-popable-p ,cmdline))
+            (push (pop ,cmdline) ,cmdline-argument))
+          (loop until (or (null ,cmdline) (option-call-p (first ,cmdline)))
+             do (push (pop ,cmdline) ,cmdline-argument))
+          (setf ,cmdline-argument (nreverse ,cmdline-argument))))
+
 
 
 ;; ==========================================================================
@@ -246,6 +262,11 @@ This function returns three values:
 	    (option cmdline-name cmdline-argument)
 	  (values t :cmdline cmdline))
       (values t :cmdline cmdline)))
+  (:method ((option strlist) cmdline-name &optional cmdline-argument cmdline)
+    (maybe-pop-argument-list cmdline option cmdline-argument)
+    (multiple-value-bind (value source)
+	(restartable-cmdline-convert option cmdline-name cmdline-argument)
+      (values value source cmdline)))
   ;; Method for all valued options:
   (:method ((option valued-option) cmdline-name &optional cmdline-argument cmdline)
     (maybe-pop-argument cmdline option cmdline-argument)
@@ -269,6 +290,12 @@ This function returns three values:
     (assert (null cmdline-argument))
     (values t :cmdline cmdline))
   ;; Method for valued options:
+  (:method ((option strlist) &optional cmdline-argument cmdline)
+    (maybe-pop-argument-list cmdline option cmdline-argument)
+    (multiple-value-bind (value source)
+	(restartable-cmdline-convert option (short-name option)
+				     cmdline-argument)
+      (values value source cmdline)))
   (:method ((option valued-option) &optional cmdline-argument cmdline)
     (maybe-pop-argument cmdline option cmdline-argument)
     (multiple-value-bind (value source)
